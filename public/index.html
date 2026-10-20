@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E0F13">
+<title>ひらり</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="feed" aria-label="イラストのフィード"></div>
+
+<div id="empty" class="gutter">
+  <h1 id="emptyTitle">読み込み中</h1>
+  <p id="emptyText">投稿を取りに行っています。</p>
+  <button class="btn" id="emptyBtn" type="button" hidden>最初の1枚を投稿する</button>
+</div>
+
+<div id="hint" hidden><span>上にスワイプで次のイラスト</span></div>
+
+<header class="top gutter">
+  <span class="logo">ひらり</span>
+  <span class="counter" id="counter"></span>
+</header>
+
+<button id="fab" type="button" aria-label="イラストを投稿する">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+
+<div class="sheet" id="sheet" hidden>
+  <form class="panel gutter" id="form">
+    <h2>イラストを投稿</h2>
+    <label class="pick" id="pick" for="file">
+      <span id="pickText">タップして写真を1枚選ぶ</span>
+      <img id="preview" alt="選んだ写真のプレビュー" hidden>
+    </label>
+    <input class="sr" type="file" id="file" accept="image/*">
+    <input class="field" type="text" id="title" maxlength="40" placeholder="タイトル（なくてもOK）" autocomplete="off">
+    <p class="note">投稿は誰でも見られます。自分が描いた絵、または投稿してよい絵だけを上げてください。</p>
+    <p id="status" aria-live="polite"></p>
+    <div class="row">
+      <button class="btn ghost" type="button" id="cancel">キャンセル</button>
+      <button class="btn" type="submit" id="send" disabled>投稿する</button>
+    </div>
+  </form>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
