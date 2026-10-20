@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: hirari
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hirari-db
+          property: connectionString
+      - key: ADMIN_TOKEN
+        generateValue: true
+
+databases:
+  - name: hirari-db
+    plan: free
+    databaseName: hirari
+    user: hirari
