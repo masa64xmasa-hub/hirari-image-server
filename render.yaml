@@ -3,7 +3,8 @@ services:
     name: hirari
     runtime: node
     plan: free
-    buildCommand: npm install
+    # npm install のあとに、似ている絵の検出に使うAIモデルを先にダウンロードしておく
+    buildCommand: npm install && npm run prefetch-model
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:
@@ -15,6 +16,15 @@ services:
           property: connectionString
       - key: ADMIN_TOKEN
         generateValue: true
+      # 似ている絵の検出。止めたいときは 0 に書き換える
+      - key: ENABLE_SIMILARITY
+        value: "1"
+      # 原作者に見せる類似度（0.5〜0.99）
+      - key: SIMILARITY_THRESHOLD
+        value: "0.85"
+      # インストール時に、使わないGPU用の大きなファイルを取りに行かない
+      - key: ONNXRUNTIME_NODE_INSTALL_CUDA
+        value: skip
 
 databases:
   - name: hirari-db
