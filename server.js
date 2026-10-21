@@ -89,7 +89,51 @@ async function initDb() {
       UNIQUE (a_id, b_id)
     );
     CREATE INDEX IF NOT EXISTS similar_pairs_a_idx ON similar_pairs (a_id);
+
+    -- 通報の記録。1人が同じ投稿（コメント）を通報できるのは1回まで。24時間たつと記録も件数も消える
+    CREATE TABLE IF NOT EXISTS report_log (
+      kind       text NOT NULL,
+      target     uuid NOT NULL,
+      reporter   text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (kind, target, reporter)
+    );
+    CREATE INDEX IF NOT EXISTS report_log_created_idx ON report_log (created_at);
   `);
+}
+
+/* ---------- 通報 ---------- */
+const REPORT_TABLES = { post: "posts", comment: "comments" };
+
+// 通報を1件記録し、そのときの「24時間以内の通報者数」を reports に入れる
+async function addReport(kind, id, reporter) {
+  const table = REPORT_TABLES[kind];
+  await pool.query(
+    "DELETE FROM report_log WHERE kind = $1 AND target = $2 AND created_at < now() - interval '1 day'",
+    [kind, id]
+  );
+  await pool.query(
+    "INSERT INTO report_log (kind, target, reporter) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+    [kind, id, reporter]
+  );
+  await pool.query(
+    `UPDATE ${table} SET reports = (SELECT count(*) FROM report_log WHERE kind = $1 AND target = $2) WHERE id = $2`,
+    [kind, id]
+  );
+}
+
+// 24時間たった通報を消し、件数を数え直す（非表示も、そのとき解除される）
+async function sweepReports() {
+  await pool.query("DELETE FROM report_log WHERE created_at < now() - interval '1 day'");
+  for (const [kind, table] of Object.entries(REPORT_TABLES)) {
+    await pool.query(
+      `UPDATE ${table} t SET reports = c.n
+         FROM (SELECT t2.id, (SELECT count(*) FROM report_log r WHERE r.kind = $1 AND r.target = t2.id)::int AS n
+                 FROM ${table} t2 WHERE t2.reports > 0) c
+        WHERE t.id = c.id AND t.reports <> c.n`,
+      [kind]
+    );
+  }
 }
 
 /* ---------- 似ている絵の検出 ---------- */
@@ -477,7 +521,7 @@ app.delete("/api/posts/:id", async (req, res, next) => {
 app.post("/api/posts/:id/report", reportLimiter, async (req, res, next) => {
   try {
     if (!UUID_RE.test(req.params.id)) return res.sendStatus(404);
-    await pool.query("UPDATE posts SET reports = reports + 1 WHERE id = $1", [req.params.id]);
+    await addReport("post", req.params.id, clientId(req) || "ip:" + req.ip);
     res.sendStatus(204);
   } catch (e) {
     next(e);
@@ -599,7 +643,7 @@ app.delete("/api/comments/:id", async (req, res, next) => {
 app.post("/api/comments/:id/report", reportLimiter, async (req, res, next) => {
   try {
     if (!UUID_RE.test(req.params.id)) return res.sendStatus(404);
-    await pool.query("UPDATE comments SET reports = reports + 1 WHERE id = $1", [req.params.id]);
+    await addReport("comment", req.params.id, clientId(req) || "ip:" + req.ip);
     res.sendStatus(204);
   } catch (e) {
     next(e);
@@ -723,6 +767,8 @@ app.use((err, req, res, next) => {
 initDb()
   .then(() =>
     app.listen(PORT, () => {
+      sweepReports().catch((e) => console.error("通報の整理に失敗", e));
+      setInterval(() => sweepReports().catch((e) => console.error("通報の整理に失敗", e)), 10 * 60 * 1000).unref();
       console.log("ひらり: port " + PORT + (SIM_ENABLED ? "（似ている絵の検出: ON）" : ""));
       if (SIM_ENABLED) enqueueBacklog().catch((e) => console.error("未処理の絵の取得に失敗", e));
     })
