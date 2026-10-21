@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>管理｜ひらり</title>
+<link rel="stylesheet" href="/page.css">
+</head>
+<body>
+<main>
+  <a class="back" href="/">← ひらりに戻る</a>
+  <h1>管理画面</h1>
+
+  <section class="card" id="login">
+    <p>Renderの Environment にある <b>ADMIN_TOKEN</b> の値を入れてください。このタブを閉じると忘れます。</p>
+    <form class="row" id="loginForm">
+      <input type="password" id="token" autocomplete="off" placeholder="ADMIN_TOKEN" aria-label="ADMIN_TOKEN">
+      <button type="submit">ログイン</button>
+    </form>
+    <p id="loginMsg" class="err" aria-live="polite"></p>
+  </section>
+
+  <div id="app" hidden>
+    <div class="row" style="justify-content: space-between; margin-bottom: 8px">
+      <span class="muted" id="who">ログイン中</span>
+      <button class="ghost" type="button" id="logout">ログアウト</button>
+    </div>
+
+    <h2>いまの状況</h2>
+    <section class="card"><div class="stats" id="stats"></div></section>
+
+    <h2>通報された投稿・コメント</h2>
+    <p class="muted">通報は24時間でリセットされます。「通報を取り消す」を押すと、非表示も解除されます。</p>
+    <div id="reported"></div>
+
+    <h2>新しい順の投稿</h2>
+    <div id="recent"></div>
+    <button class="ghost" type="button" id="more" hidden>さらに読み込む</button>
+
+    <h2>バックアップと復元</h2>
+    <section class="card">
+      <p>無料のデータベースは作成から約30日で使えなくなります。<b>期限の前に、必ずバックアップを保存してください。</b>絵・コメント・いいねが1つのファイルに入ります。</p>
+      <form method="post" action="/api/admin/backup" id="backupForm">
+        <input type="hidden" name="token" id="backupToken">
+        <button type="submit">バックアップを保存する</button>
+      </form>
+      <p class="muted">保存が終わるまで、画面を閉じずにお待ちください。ファイルの最後が欠けていないかは、復元のときに確認されます。</p>
+      <hr style="border: 0; border-top: 1px solid var(--line); margin: 16px 0">
+      <p>バックアップのファイルから戻す（すでにある投稿は変えず、足りないものだけ足します）。</p>
+      <div class="row">
+        <input type="file" id="restoreFile" accept=".ndjson,application/x-ndjson,text/plain" aria-label="バックアップのファイル">
+        <button type="button" class="ghost" id="restoreBtn">復元する</button>
+      </div>
+      <p id="restoreMsg" aria-live="polite"></p>
+    </section>
+  </div>
+</main>
+<script src="/admin.js"></script>
+</body>
+</html>
