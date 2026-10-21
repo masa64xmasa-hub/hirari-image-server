@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const helmet = require("helmet");
@@ -10,6 +11,7 @@ const { Pool } = require("pg");
 const rateLimit = require("express-rate-limit");
 const { toBuffer, fromBuffer, findSimilar, orderPair, Embedder } = require("./similarity");
 const { parseTags, rankFeed, TAG_RE } = require("./ranking");
+const { registerAdmin } = require("./admin-routes");
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
@@ -280,10 +282,12 @@ function clientId(req) {
   return CLIENT_RE.test(v) ? v : null;
 }
 
-function isAdmin(req) {
-  const given = String(req.get("authorization") || "").replace(/^Bearer\s+/i, "");
+function tokenOk(given) {
   if (!ADMIN_TOKEN) return false;
-  return crypto.timingSafeEqual(Buffer.from(sha256(given)), Buffer.from(sha256(ADMIN_TOKEN)));
+  return crypto.timingSafeEqual(Buffer.from(sha256(String(given))), Buffer.from(sha256(ADMIN_TOKEN)));
+}
+function isAdmin(req) {
+  return tokenOk(String(req.get("authorization") || "").replace(/^Bearer\s+/i, ""));
 }
 
 /* ---------- API ---------- */
@@ -314,6 +318,23 @@ app.get("/api/posts", async (req, res, next) => {
   }
 });
 
+// 1枚だけ取得（共有リンクから開いたとき用）
+app.get("/api/posts/:id", async (req, res, next) => {
+  try {
+    if (!UUID_RE.test(req.params.id)) return res.sendStatus(404);
+    const { rows } = await pool.query(
+      `SELECT ${POST_COLS},
+              EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.client_id = $3::text) AS liked
+         FROM posts p WHERE p.id = $2 AND p.reports < $1`,
+      [REPORT_LIMIT, req.params.id, clientId(req)]
+    );
+    if (!rows.length) return res.sendStatus(404);
+    res.json(postRow(rows[0]));
+  } catch (e) {
+    next(e);
+  }
+});
+
 app.get("/img/:id", async (req, res, next) => {
   try {
     if (!UUID_RE.test(req.params.id)) return res.sendStatus(404);
@@ -333,6 +354,8 @@ app.get("/img/:id", async (req, res, next) => {
 app.post("/api/posts", postLimiter, upload.single("photo"), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ error: "no_image" });
+    // 規約への同意（自分の絵、または投稿してよい絵であること）
+    if (req.body.agree !== "1") return res.status(400).json({ error: "agree_required" });
 
     let jpeg;
     try {
@@ -747,6 +770,50 @@ app.delete("/api/admin/comments/:id", async (req, res, next) => {
     if (!UUID_RE.test(req.params.id)) return res.sendStatus(404);
     const { rowCount } = await pool.query("DELETE FROM comments WHERE id = $1", [req.params.id]);
     res.sendStatus(rowCount ? 204 : 404);
+  } catch (e) {
+    next(e);
+  }
+});
+
+registerAdmin(app, { pool, tokenOk, UUID_RE, REPORT_LIMIT, simEnabled: SIM_ENABLED });
+
+// 規約ページに出す連絡先（Renderの環境変数 CONTACT に書く。メールアドレスやSNSのURLなど）
+app.get("/api/config", (req, res) => {
+  res.set("Cache-Control", "public, max-age=300");
+  res.json({ contact: String(process.env.CONTACT || "").slice(0, 200) });
+});
+
+/* ---------- 共有リンク（/p/<投稿ID>） ---------- */
+// SNSに貼ったときに絵が表示されるよう、OGPのタグを足した index.html を返す
+const INDEX_HTML = fs.readFileSync(path.join(__dirname, "public", "index.html"), "utf8");
+const esc = (s) =>
+  String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+app.get("/p/:id", async (req, res, next) => {
+  try {
+    res.set("Cache-Control", "no-cache");
+    res.type("html");
+    if (!UUID_RE.test(req.params.id)) return res.send(INDEX_HTML);
+    const { rows } = await pool.query("SELECT title, tags FROM posts WHERE id = $1 AND reports < $2", [
+      req.params.id,
+      REPORT_LIMIT,
+    ]);
+    if (!rows.length) return res.send(INDEX_HTML);
+    const origin = req.protocol + "://" + req.get("host");
+    const title = (rows[0].title ? rows[0].title + "｜" : "") + "ひらり";
+    const desc = rows[0].tags && rows[0].tags.length
+      ? rows[0].tags.map((t) => "#" + t).join(" ") + " のイラスト"
+      : "ひらりで見つけたイラスト";
+    const meta = [
+      `<meta property="og:type" content="website">`,
+      `<meta property="og:site_name" content="ひらり">`,
+      `<meta property="og:title" content="${esc(title)}">`,
+      `<meta property="og:description" content="${esc(desc)}">`,
+      `<meta property="og:url" content="${esc(origin + "/p/" + req.params.id)}">`,
+      `<meta property="og:image" content="${esc(origin + "/img/" + req.params.id)}">`,
+      `<meta name="twitter:card" content="summary_large_image">`,
+    ].join("\n");
+    res.send(INDEX_HTML.replace("<title>ひらり</title>", `<title>${esc(title)}</title>\n${meta}`));
   } catch (e) {
     next(e);
   }
