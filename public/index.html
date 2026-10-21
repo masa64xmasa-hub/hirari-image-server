@@ -23,9 +23,17 @@
 
 <header class="top gutter">
   <span class="logo">ひらり</span>
+  <div class="tabs" id="tabs" role="group" aria-label="表示の切り替え">
+    <button type="button" id="tabRec" aria-pressed="true">おすすめ</button>
+    <button type="button" id="tabNew" aria-pressed="false">新着</button>
+  </div>
+  <button class="tagchip" id="tagchip" type="button" hidden></button>
   <span class="topr">
     <button class="rbtn" id="rbtn" type="button" hidden>似ている絵 <b id="rcount">0</b></button>
     <span class="counter" id="counter"></span>
+    <button class="ibtn" id="mbtn" type="button" aria-label="自分の投稿">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    </button>
   </span>
 </header>
 
@@ -43,6 +51,9 @@
     </label>
     <input class="sr" type="file" id="file" accept="image/*">
     <input class="field" type="text" id="title" maxlength="40" placeholder="タイトル（なくてもOK）" autocomplete="off">
+    <input class="field" type="text" id="tags" placeholder="タグ（#猫 #水彩 のように、5個まで）" autocomplete="off" autocapitalize="off">
+    <p class="note" id="tagprev" aria-live="polite"></p>
+    <div class="tagsug" id="tagsug" hidden></div>
     <p class="note">投稿は誰でも見られます。自分が描いた絵、または投稿してよい絵だけを上げてください。</p>
     <p id="status" aria-live="polite"></p>
     <div class="row">
@@ -65,6 +76,19 @@
       <button class="btn" type="submit" id="csend">送信</button>
     </form>
     <p id="cstatus" class="note" aria-live="polite"></p>
+  </div>
+</div>
+
+<!-- 自分の投稿一覧 -->
+<div class="sheet" id="msheet" hidden>
+  <div class="panel gutter">
+    <div class="phead">
+      <h2 id="mtitle">自分の投稿</h2>
+      <button class="btn ghost small" type="button" id="mclose">閉じる</button>
+    </div>
+    <p class="note">このブラウザで投稿した絵です。別の端末や、ブラウザのデータを消した後は表示されません。</p>
+    <ul id="mlist" aria-live="polite"></ul>
+    <p id="mstatus" class="note" aria-live="polite"></p>
   </div>
 </div>
 
