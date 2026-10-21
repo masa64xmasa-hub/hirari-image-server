@@ -12,6 +12,7 @@
   var rsheet = $("rsheet"), rlist = $("rlist"), rbtn = $("rbtn"), rcount = $("rcount"), rstatus = $("rstatus");
   var tabRec = $("tabRec"), tabNew = $("tabNew"), tagchip = $("tagchip");
   var tagsIn = $("tags"), tagprev = $("tagprev"), tagsug = $("tagsug");
+  var agreeIn = $("agree");
   var msheet = $("msheet"), mlist = $("mlist"), mstatus = $("mstatus"), mbtn = $("mbtn");
 
   var PAGE = 12;
@@ -27,6 +28,7 @@
   var csending = false;
 
   var ICON_HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5l-1.2-1.1C6 15.1 3 12.4 3 8.9 3 6.2 5.1 4 7.8 4c1.6 0 3.1.8 4.2 2 1.1-1.2 2.6-2 4.2-2C18.9 4 21 6.2 21 8.9c0 3.5-3 6.2-7.8 10.5L12 20.5z"/></svg>';
+  var ICON_SHARE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';
   var ICON_COMMENT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
 
   /* ---------- このブラウザの目印（localStorage） ---------- */
@@ -313,10 +315,13 @@
     // いいね・コメント
     var like = mkAct(ICON_HEART, "いいね");
     var cmt = mkAct(ICON_COMMENT, "コメントを見る・書く");
+    var shr = mkAct(ICON_SHARE, "この絵のリンクを共有する");
     var acts = document.createElement("div");
     acts.className = "acts";
     acts.appendChild(like.btn);
     acts.appendChild(cmt.btn);
+    acts.appendChild(shr.btn);
+    shr.btn.addEventListener("click", function () { sharePost(p, shr); });
 
     function paint() {
       like.btn.classList.toggle("on", st.liked);
@@ -350,6 +355,23 @@
     el.appendChild(acts);
     if (io) io.observe(el);
     return { el: el, st: st, paint: paint, p: p };
+  }
+
+  // 共有リンク（/p/<ID>）を、共有シートに渡す。使えないときはコピーする
+  function sharePost(p, act) {
+    var url = location.origin + "/p/" + p.id;
+    var flash = function (t) {
+      act.n.textContent = t;
+      setTimeout(function () { act.n.textContent = ""; }, 1800);
+    };
+    if (navigator.share) {
+      navigator.share({ title: (p.title ? p.title + "｜" : "") + "ひらり", url: url }).catch(function () {});
+      return;
+    }
+    var copy = (navigator.clipboard && navigator.clipboard.writeText)
+      ? navigator.clipboard.writeText(url)
+      : Promise.reject();
+    copy.then(function () { flash("コピー"); }).catch(function () { window.prompt("このリンクをコピーしてください", url); });
   }
 
   function removeMine(id, el, reset) {
@@ -963,9 +985,12 @@
     if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
     preview.hidden = true; preview.removeAttribute("src");
     pickText.hidden = false;
+    agreeIn.checked = false;
     sendBtn.disabled = true;
     setStatus("");
   }
+  function syncSend() { sendBtn.disabled = busy || !file || !agreeIn.checked; }
+  agreeIn.addEventListener("change", syncSend);
   fab.addEventListener("click", openSheet);
   emptyBtn.addEventListener("click", function () {
     if (emptyMode === "error") { showEmpty("loading"); loadMore(); } else { openSheet(); }
@@ -983,7 +1008,7 @@
     preview.src = previewUrl;
     preview.hidden = false;
     pickText.hidden = true;
-    sendBtn.disabled = false;
+    syncSend();
     setStatus("");
   });
 
@@ -1015,6 +1040,7 @@
 
   function errMessage(code, status) {
     if (code === "too_large") return "写真が大きすぎます。別の写真を選んでください。";
+    if (code === "agree_required") return "利用規約への同意にチェックを入れてください。";
     if (code === "bad_image") return "この写真を読み込めませんでした。JPEGかPNGで試してください。";
     if (status === 429 || code === "rate_limited") return "続けて投稿しすぎです。1時間ほど待ってからもう一度試してください。";
     return "投稿できませんでした。もう一度試してください。";
@@ -1022,7 +1048,7 @@
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    if (!file || busy) return;
+    if (!file || busy || !agreeIn.checked) return;
     busy = true;
     sendBtn.disabled = true;
     setStatus("アップロード中…");
@@ -1031,6 +1057,7 @@
         var fd = new FormData();
         fd.append("title", titleIn.value.trim().slice(0, 40));
         fd.append("tags", parseTags(tagsIn.value).list.join(" "));
+        fd.append("agree", "1");
         fd.append("photo", blob, "photo.jpg"); // ファイルは最後に追加する
         return api("/api/posts", { method: "POST", body: fd });
       })
@@ -1056,8 +1083,8 @@
       })
       .catch(function (err) {
         setStatus(errMessage(err && err.code, err && err.status), true);
-        sendBtn.disabled = false;
         busy = false;
+        syncSend();
       });
   });
 
@@ -1160,4 +1187,27 @@
 
   setMode("rec");
   checkReview(true);
+
+  // 共有リンク（/p/<ID>）から開いたときは、その絵を先頭に出す
+  var sm = /^\/p\/([0-9a-f-]{36})\/?$/.exec(location.pathname);
+  if (sm) {
+    var sid = sm[1];
+    try { history.replaceState(null, "", "/"); } catch (e) {}
+    api("/api/posts/" + sid)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (p) {
+        if (!p) return;
+        var c = cards.get(p.id);
+        if (c) { feed.insertBefore(c.el, feed.firstChild); }
+        else {
+          c = buildCard(p, true);
+          cards.set(p.id, c);
+          feed.insertBefore(c.el, feed.firstChild);
+        }
+        showEmpty("none");
+        feed.scrollTo({ top: 0, behavior: "auto" });
+        updateCounter();
+      })
+      .catch(function () {});
+  }
 })();
