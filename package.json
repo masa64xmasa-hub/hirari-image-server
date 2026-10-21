@@ -1,21 +1,23 @@
 {
   "name": "hirari",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "スワイプで見られるイラスト投稿サイト",
   "private": true,
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "prefetch-model": "node embed-worker.js --prefetch"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.13.1",
-    "sharp": "^0.33.5"
+    "sharp": "^0.34.3"
   }
 }
