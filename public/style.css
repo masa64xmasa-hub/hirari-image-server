@@ -8,6 +8,9 @@
   --accent: #2F4BFF;
   --on-accent: #FFFFFF;
   --danger: #C62A3A;
+  --on-danger: #FFFFFF;
+  --like: #FF4D6A;
+  --viewer-bg: #000000;
   --scrim: rgba(8, 10, 16, 0.66);
   --scrim-fg: #FFFFFF;
   --safe-t: env(safe-area-inset-top, 0px);
@@ -21,7 +24,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0E0F13; --surface: #191B21; --fg: #ECEEF3; --muted: #9AA1AF;
-    --line: #2A2D36; --accent: #8397FF; --on-accent: #0E0F13; --danger: #FF7A87;
+    --line: #2A2D36; --accent: #8397FF; --on-accent: #0E0F13; --danger: #FF7A87; --on-danger: #0E0F13;
     color-scheme: dark;
   }
 }
@@ -57,6 +60,14 @@ button { cursor: pointer; }
   pointer-events: none;
 }
 .logo { font-family: var(--font-display); font-size: 22px; letter-spacing: 0.04em; }
+.topr { display: flex; align-items: center; gap: 12px; }
+.rbtn {
+  pointer-events: auto;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.35); color: var(--scrim-fg); font-size: 13px;
+}
+.rbtn b { font-variant-numeric: tabular-nums; margin-left: 4px; }
 .counter { font-variant-numeric: tabular-nums; font-size: 13px; letter-spacing: 0.06em; opacity: 0.9; }
 
 /* ---- feed ---- */
@@ -90,6 +101,7 @@ button { cursor: pointer; }
   width: 100%;
   height: calc(100% - 148px - var(--safe-t) - var(--safe-b));
   object-fit: contain;
+  cursor: zoom-in;
 }
 .cap {
   position: absolute; left: 0; right: 0; bottom: 0;
@@ -98,15 +110,44 @@ button { cursor: pointer; }
   padding-right: max(88px, calc(var(--safe-r) + 80px));
   background: linear-gradient(transparent, var(--scrim));
   color: var(--scrim-fg);
+  pointer-events: none;
 }
+.cap .act { pointer-events: auto; }
 .ttl { margin: 0; font-size: 17px; font-weight: 700; line-height: 1.4; text-wrap: balance; overflow-wrap: anywhere; }
 .meta { margin: 2px 0 0; display: flex; align-items: center; gap: 12px; font-size: 12px; opacity: 0.9; min-height: 28px; }
 .act {
   background: transparent; border: 1px solid currentColor; color: inherit;
   border-radius: 6px; padding: 3px 10px; font-size: 12px;
 }
-.act.armed { background: var(--danger); border-color: var(--danger); color: #fff; }
+.act.armed { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
 .act[disabled] { opacity: 0.6; cursor: default; }
+
+/* ---- いいね・コメントのボタン ---- */
+.acts {
+  position: absolute; z-index: 4;
+  right: max(16px, var(--safe-r));
+  bottom: calc(104px + var(--safe-b));
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.abtn {
+  display: grid; justify-items: center; gap: 3px;
+  min-width: 48px; padding: 0; border: 0; background: none;
+  color: var(--scrim-fg);
+}
+.abtn .ic {
+  width: 46px; height: 46px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--scrim);
+}
+.abtn svg {
+  width: 24px; height: 24px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.abtn.on svg { fill: var(--like); stroke: var(--like); }
+.abtn .n {
+  min-height: 1em; font-size: 12px; font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
 
 /* ---- hint & empty ---- */
 #hint {
@@ -132,6 +173,7 @@ button { cursor: pointer; }
   background: var(--accent); color: var(--on-accent);
 }
 .btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.btn.small { padding: 7px 14px; font-size: 13px; }
 .btn[disabled] { opacity: 0.5; cursor: default; }
 #fab {
   position: absolute; z-index: 6;
@@ -143,7 +185,7 @@ button { cursor: pointer; }
 }
 #fab svg { width: 26px; height: 26px; }
 
-/* ---- post sheet ---- */
+/* ---- sheets（投稿・コメント） ---- */
 .sheet {
   position: absolute; inset: 0; z-index: 20;
   display: flex; align-items: flex-end; justify-content: center;
@@ -158,6 +200,7 @@ button { cursor: pointer; }
   display: flex; flex-direction: column; gap: 14px;
 }
 .panel h2 { margin: 0; font-size: 18px; }
+.phead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .pick {
   display: grid; place-items: center; min-height: 160px;
   border: 2px dashed var(--line); border-radius: 12px; overflow: hidden;
@@ -171,13 +214,93 @@ button { cursor: pointer; }
 }
 .note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
 #status { margin: 0; min-height: 1.4em; font-size: 13px; color: var(--muted); }
-#status.err { color: var(--danger); }
+#status.err, #cstatus.err { color: var(--danger); }
 .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---- コメント ---- */
+#clist {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 14px;
+  overflow-y: auto; max-height: 45vh; min-height: 64px;
+}
+#clist li { min-width: 0; }
+#clist li.cinfo { color: var(--muted); font-size: 14px; }
+.ctext { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+.cmeta { display: flex; align-items: center; gap: 12px; margin-top: 3px; font-size: 12px; color: var(--muted); }
+.cact { padding: 0; border: 0; background: none; color: var(--muted); font-size: 12px; text-decoration: underline; }
+.cact.armed { color: var(--danger); font-weight: 700; }
+.cact[disabled] { opacity: 0.6; cursor: default; text-decoration: none; }
+.cform { display: flex; gap: 8px; }
+.cform .field { flex: 1; min-width: 0; }
+
+/* ---- 似ている絵の確認 ---- */
+#rlist {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 22px;
+  overflow-y: auto; max-height: 60vh;
+}
+#rlist li.rinfo { color: var(--muted); font-size: 14px; }
+.pair { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pair-imgs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pair-imgs figure { margin: 0; min-width: 0; }
+.pair-imgs button {
+  display: block; width: 100%; padding: 0; border: 1px solid var(--line);
+  border-radius: 8px; overflow: hidden; background: var(--bg); cursor: zoom-in;
+}
+.pair-imgs img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: contain; }
+.pair-imgs figcaption { margin-top: 4px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.pair-score { margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.pair-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.pair-btns .btn { padding: 9px 12px; font-size: 13px; }
+.btn.warn { background: var(--danger); color: var(--on-danger); }
+#rstatus.err { color: var(--danger); }
+
+/* ---- ズーム・回転ビューア ---- */
+.viewer { position: absolute; inset: 0; z-index: 30; background: var(--viewer-bg); }
+.stage {
+  position: absolute; inset: 0; overflow: hidden;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  cursor: grab;
+}
+.stage img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; transform-origin: 50% 50%; will-change: transform;
+  pointer-events: none; -webkit-user-drag: none;
+}
+.stage img.anim { transition: transform 0.22s ease; }
+.vclose {
+  position: absolute; z-index: 3;
+  top: calc(12px + var(--safe-t)); right: max(16px, var(--safe-r));
+  width: 46px; height: 46px; border-radius: 50%; border: 0;
+  display: grid; place-items: center;
+  background: var(--scrim); color: var(--scrim-fg);
+}
+.vclose svg { width: 22px; height: 22px; }
+.vbar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  display: flex; justify-content: center; gap: 10px;
+  padding-top: 28px; padding-bottom: calc(18px + var(--safe-b));
+  background: linear-gradient(transparent, var(--scrim));
+}
+.vbtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 16px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.35); color: var(--scrim-fg); font-size: 14px;
+}
+.vbtn svg { width: 18px; height: 18px; }
+.vhelp {
+  position: absolute; left: 0; right: 0; z-index: 2;
+  bottom: calc(86px + var(--safe-b)); margin: 0; text-align: center;
+  font-size: 12px; color: var(--scrim-fg); opacity: 0.8; pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
 
 @media (prefers-reduced-motion: no-preference) {
   #feed { scroll-behavior: smooth; }
 }
 @media (prefers-reduced-motion: reduce) {
   #hint { transition: none; }
+  .stage img.anim { transition: none; }
 }
