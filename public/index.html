@@ -54,7 +54,8 @@
     <input class="field" type="text" id="tags" placeholder="タグ（#猫 #水彩 のように、5個まで）" autocomplete="off" autocapitalize="off">
     <p class="note" id="tagprev" aria-live="polite"></p>
     <div class="tagsug" id="tagsug" hidden></div>
-    <p class="note">投稿は誰でも見られます。自分が描いた絵、または投稿してよい絵だけを上げてください。</p>
+    <p class="note">投稿は誰でも見られます。</p>
+    <label class="agree"><input type="checkbox" id="agree"> <span>自分で描いた絵、または投稿の許可を得た絵です。<a href="/terms.html" target="_blank" rel="noopener">利用規約</a>に同意します。</span></label>
     <p id="status" aria-live="polite"></p>
     <div class="row">
       <button class="btn ghost" type="button" id="cancel">キャンセル</button>
@@ -86,7 +87,7 @@
       <h2 id="mtitle">自分の投稿</h2>
       <button class="btn ghost small" type="button" id="mclose">閉じる</button>
     </div>
-    <p class="note">このブラウザで投稿した絵です。別の端末や、ブラウザのデータを消した後は表示されません。</p>
+    <p class="note">このブラウザで投稿した絵です。別の端末や、ブラウザのデータを消した後は表示されません。 <a href="/terms.html" target="_blank" rel="noopener">規約・問い合わせ</a></p>
     <ul id="mlist" aria-live="polite"></ul>
     <p id="mstatus" class="note" aria-live="polite"></p>
   </div>
