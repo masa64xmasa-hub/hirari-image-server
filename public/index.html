@@ -23,13 +23,17 @@
 
 <header class="top gutter">
   <span class="logo">ひらり</span>
-  <span class="counter" id="counter"></span>
+  <span class="topr">
+    <button class="rbtn" id="rbtn" type="button" hidden>似ている絵 <b id="rcount">0</b></button>
+    <span class="counter" id="counter"></span>
+  </span>
 </header>
 
 <button id="fab" type="button" aria-label="イラストを投稿する">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
 </button>
 
+<!-- 投稿シート -->
 <div class="sheet" id="sheet" hidden>
   <form class="panel gutter" id="form">
     <h2>イラストを投稿</h2>
@@ -46,6 +50,55 @@
       <button class="btn" type="submit" id="send" disabled>投稿する</button>
     </div>
   </form>
+</div>
+
+<!-- コメントシート -->
+<div class="sheet" id="csheet" hidden>
+  <div class="panel gutter" id="cpanel">
+    <div class="phead">
+      <h2>コメント</h2>
+      <button class="btn ghost small" type="button" id="cclose">閉じる</button>
+    </div>
+    <ul id="clist" aria-live="polite"></ul>
+    <form class="cform" id="cform">
+      <input class="field" type="text" id="cbody" maxlength="200" placeholder="コメントを書く（200文字まで）" autocomplete="off">
+      <button class="btn" type="submit" id="csend">送信</button>
+    </form>
+    <p id="cstatus" class="note" aria-live="polite"></p>
+  </div>
+</div>
+
+<!-- 似ている絵の確認（原作者向け） -->
+<div class="sheet" id="rsheet" hidden>
+  <div class="panel gutter">
+    <div class="phead">
+      <h2>似ている絵の確認</h2>
+      <button class="btn ghost small" type="button" id="rclose">閉じる</button>
+    </div>
+    <p class="note">あなたの絵に似た絵が、あとから投稿されました。似ているだけの場合も多いので、絵をタップして拡大し、よく見てから選んでください。選んだ結果はあなたにだけ表示され、相手や他の人には表示されません。</p>
+    <ul id="rlist" aria-live="polite"></ul>
+    <p id="rstatus" class="note" aria-live="polite"></p>
+  </div>
+</div>
+
+<!-- ズーム・回転ビューア -->
+<div class="viewer" id="viewer" hidden>
+  <div class="stage" id="stage"><img id="vimg" alt="" draggable="false"></div>
+  <button class="vclose" type="button" id="vclose" aria-label="閉じる">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+  <div class="vbar gutter">
+    <button class="vbtn" type="button" id="vleft" aria-label="左に回転">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+      <span>左回転</span>
+    </button>
+    <button class="vbtn" type="button" id="vreset">元に戻す</button>
+    <button class="vbtn" type="button" id="vright" aria-label="右に回転">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+      <span>右回転</span>
+    </button>
+  </div>
+  <p class="vhelp">2本指で拡大・回転、ダブルタップで拡大</p>
 </div>
 
 <script src="/app.js"></script>
