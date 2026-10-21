@@ -372,3 +372,9 @@ button { cursor: pointer; }
   #hint { transition: none; }
   .stage img.anim { transition: none; }
 }
+
+/* ---- 規約への同意 ---- */
+.agree { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.6; margin: 0 0 8px; }
+.agree input { width: 20px; height: 20px; flex: none; margin: 1px 0 0; accent-color: var(--accent); }
+.agree a { color: var(--accent); }
+.note a { color: var(--accent); }
