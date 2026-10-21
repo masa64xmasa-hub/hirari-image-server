@@ -60,7 +60,28 @@ button { cursor: pointer; }
   pointer-events: none;
 }
 .logo { font-family: var(--font-display); font-size: 22px; letter-spacing: 0.04em; }
-.topr { display: flex; align-items: center; gap: 12px; }
+.top { flex-wrap: wrap; row-gap: 6px; }
+.topr { display: flex; align-items: center; gap: 10px; }
+.tabs {
+  display: flex; gap: 2px; padding: 3px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35); pointer-events: auto;
+}
+.tabs button {
+  padding: 5px 12px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--scrim-fg); font-size: 13px; opacity: 0.75;
+}
+.tabs button[aria-pressed="true"] { background: rgba(255, 255, 255, 0.92); color: #14161B; opacity: 1; font-weight: 700; }
+.tagchip {
+  pointer-events: auto; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.7); background: rgba(0, 0, 0, 0.35);
+  color: var(--scrim-fg); font-size: 13px; max-width: 46vw;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ibtn {
+  pointer-events: auto; width: 38px; height: 38px; display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.35); color: var(--scrim-fg);
+}
+.ibtn svg { width: 20px; height: 20px; }
 .rbtn {
   pointer-events: auto;
   padding: 6px 12px; border-radius: 999px;
@@ -233,6 +254,53 @@ button { cursor: pointer; }
 .cact[disabled] { opacity: 0.6; cursor: default; text-decoration: none; }
 .cform { display: flex; gap: 8px; }
 .cform .field { flex: 1; min-width: 0; }
+
+/* ---- タグ ---- */
+.tags { margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 6px; }
+.tagbtn {
+  pointer-events: auto; padding: 2px 9px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.55); background: rgba(0, 0, 0, 0.3);
+  color: var(--scrim-fg); font-size: 12px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tagsug { display: flex; flex-wrap: wrap; gap: 6px; }
+.tagsug button {
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); font-size: 12px;
+}
+
+/* ---- おすすめの終わり ---- */
+.endcard {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; text-align: center; padding-left: max(16px, var(--safe-l)); padding-right: max(16px, var(--safe-r));
+}
+.endcard h2 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 400; }
+.endcard p { margin: 0; max-width: 26em; color: var(--muted); line-height: 1.7; }
+.endcard .row { justify-content: center; }
+
+/* ---- 自分の投稿 ---- */
+#mlist {
+  list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 62vh;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px;
+}
+#mlist li.minfo { grid-column: 1 / -1; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.mitem { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mthumb {
+  display: block; width: 100%; padding: 0; border: 1px solid var(--line);
+  border-radius: 8px; overflow: hidden; background: var(--bg); cursor: zoom-in;
+}
+.mthumb img { display: block; width: 100%; aspect-ratio: 1 / 1; object-fit: cover; }
+.mmeta { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mtags { display: flex; flex-wrap: wrap; gap: 4px; }
+.mtags button {
+  padding: 0; border: 0; background: none; color: var(--accent);
+  font-size: 11px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mhide { font-size: 11px; color: var(--danger); }
+.mdel { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--muted); font-size: 11px; text-decoration: underline; }
+.mdel.armed { color: var(--danger); font-weight: 700; }
+.mdel[disabled] { opacity: 0.6; cursor: default; text-decoration: none; }
+#mstatus.err { color: var(--danger); }
 
 /* ---- 似ている絵の確認 ---- */
 #rlist {
