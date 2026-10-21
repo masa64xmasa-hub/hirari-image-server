@@ -9,6 +9,7 @@ const sharp = require("sharp");
 const { Pool } = require("pg");
 const rateLimit = require("express-rate-limit");
 const { toBuffer, fromBuffer, findSimilar, orderPair, Embedder } = require("./similarity");
+const { parseTags, rankFeed, TAG_RE } = require("./ranking");
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
@@ -70,6 +71,11 @@ async function initDb() {
 
     -- 絵の特徴ベクトル（512個の数字をfloat32で並べたもの）
     ALTER TABLE posts ADD COLUMN IF NOT EXISTS embedding bytea;
+
+    -- タグと、一覧用の小さい画像
+    ALTER TABLE posts ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';
+    ALTER TABLE posts ADD COLUMN IF NOT EXISTS thumb bytea;
+    CREATE INDEX IF NOT EXISTS posts_tags_idx ON posts USING gin (tags);
 
     -- 似ている絵のペア。a が先に投稿された絵（原作者の候補）、b が後から投稿された絵
     CREATE TABLE IF NOT EXISTS similar_pairs (
@@ -176,7 +182,7 @@ app.use(
     },
   })
 );
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "64kb" }));
 
 /* ---------- 投稿の受け取り ---------- */
 const upload = multer({
@@ -198,8 +204,31 @@ const postLimiter = limiter(12);
 const reportLimiter = limiter(30);
 const likeLimiter = limiter(200);
 const commentLimiter = limiter(20);
+const feedLimiter = limiter(600);
+const reviewLimiter = limiter(120);
 
 const sha256 = (s) => crypto.createHash("sha256").update(s).digest("hex");
+
+// 投稿一覧に付ける共通の列（いいね数・コメント数・自分がいいね済みか）
+const POST_COLS = `p.id, p.title, p.tags, p.created_at,
+       (SELECT count(*) FROM likes l WHERE l.post_id = p.id)::int AS like_count,
+       (SELECT count(*) FROM comments c WHERE c.post_id = p.id AND c.reports < $1)::int AS comment_count`;
+const postRow = (r) => ({
+  id: r.id,
+  title: r.title,
+  tags: r.tags || [],
+  createdAt: r.created_at.toISOString(),
+  likes: r.like_count,
+  comments: r.comment_count,
+  liked: !!r.liked,
+});
+
+async function makeThumb(jpeg) {
+  return sharp(jpeg)
+    .resize({ width: 360, height: 360, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 72, mozjpeg: true })
+    .toBuffer();
+}
 
 // ブラウザごとの匿名ID。いいねの重複防止と、自分のコメントの判定に使う
 function clientId(req) {
@@ -224,27 +253,18 @@ app.get("/api/posts", async (req, res, next) => {
       const t = new Date(String(req.query.before));
       if (!Number.isNaN(t.getTime())) before = t.toISOString();
     }
+    const tag = req.query.tag ? parseTags(String(req.query.tag))[0] || null : null;
     const { rows } = await pool.query(
-      `SELECT p.id, p.title, p.created_at,
-              (SELECT count(*) FROM likes l WHERE l.post_id = p.id)::int AS like_count,
-              (SELECT count(*) FROM comments c WHERE c.post_id = p.id AND c.reports < $1)::int AS comment_count,
+      `SELECT ${POST_COLS},
               EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.client_id = $4::text) AS liked
          FROM posts p
         WHERE p.reports < $1 AND ($2::timestamptz IS NULL OR p.created_at < $2::timestamptz)
+          AND ($5::text IS NULL OR $5::text = ANY(p.tags))
         ORDER BY p.created_at DESC
         LIMIT $3`,
-      [REPORT_LIMIT, before, limit, clientId(req)]
+      [REPORT_LIMIT, before, limit, clientId(req), tag]
     );
-    res.json({
-      posts: rows.map((r) => ({
-        id: r.id,
-        title: r.title,
-        createdAt: r.created_at.toISOString(),
-        likes: r.like_count,
-        comments: r.comment_count,
-        liked: r.liked,
-      })),
-    });
+    res.json({ posts: rows.map(postRow) });
   } catch (e) {
     next(e);
   }
@@ -285,23 +305,155 @@ app.post("/api/posts", postLimiter, upload.single("photo"), async (req, res, nex
     }
 
     const title = String(req.body.title || "").trim().slice(0, 40);
+    const tags = parseTags(req.body.tags);
+    const thumb = await makeThumb(jpeg);
     const deleteToken = crypto.randomBytes(24).toString("hex");
     const { rows } = await pool.query(
-      `INSERT INTO posts (title, image, token_hash)
-       VALUES ($1, $2, $3)
+      `INSERT INTO posts (title, image, token_hash, tags, thumb)
+       VALUES ($1, $2, $3, $4::text[], $5)
        RETURNING id, created_at`,
-      [title, jpeg, sha256(deleteToken)]
+      [title, jpeg, sha256(deleteToken), tags, thumb]
     );
     enqueueEmbedding(rows[0].id); // 似ている絵の検出は、返事のあとで裏で行う
     res.status(201).json({
       id: rows[0].id,
       title,
+      tags,
       createdAt: rows[0].created_at.toISOString(),
       likes: 0,
       comments: 0,
       liked: false,
       deleteToken,
     });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// 一覧用の小さい画像。古い投稿は、最初に見られたときに作って保存する
+app.get("/thumb/:id", async (req, res, next) => {
+  try {
+    if (!UUID_RE.test(req.params.id)) return res.sendStatus(404);
+    const { rows } = await pool.query(
+      "SELECT thumb, image FROM posts WHERE id = $1 AND reports < $2",
+      [req.params.id, REPORT_LIMIT]
+    );
+    if (!rows.length) return res.sendStatus(404);
+    let thumb = rows[0].thumb;
+    if (!thumb) {
+      thumb = await makeThumb(rows[0].image);
+      await pool.query("UPDATE posts SET thumb = $2 WHERE id = $1", [req.params.id, thumb]);
+    }
+    res.set("Content-Type", "image/jpeg");
+    res.set("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(thumb);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// 自分の投稿一覧。削除キーを送ると、そのキーの持ち主の投稿が返る（非表示中のものも含む）
+app.post("/api/posts/mine", reviewLimiter, async (req, res, next) => {
+  try {
+    const raw = Array.isArray(req.body && req.body.tokens) ? req.body.tokens : [];
+    const hashes = raw
+      .filter((t) => typeof t === "string" && TOKEN_RE.test(t))
+      .slice(0, 200)
+      .map(sha256);
+    if (!hashes.length) return res.json({ posts: [] });
+    const { rows } = await pool.query(
+      `SELECT ${POST_COLS}, p.reports
+         FROM posts p
+        WHERE p.token_hash = ANY($2::text[])
+        ORDER BY p.created_at DESC
+        LIMIT 200`,
+      [REPORT_LIMIT, hashes]
+    );
+    res.json({ posts: rows.map((r) => Object.assign(postRow(r), { hidden: r.reports >= REPORT_LIMIT })) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// よく使われているタグ（投稿のときの候補）
+app.get("/api/tags", async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT t, count(*)::int AS n
+         FROM (SELECT tags FROM posts WHERE reports < $1 ORDER BY created_at DESC LIMIT 1000) p,
+              unnest(p.tags) AS t
+        GROUP BY t
+        ORDER BY n DESC, t
+        LIMIT 20`,
+      [REPORT_LIMIT]
+    );
+    res.set("Cache-Control", "public, max-age=60");
+    res.json({ tags: rows.map((r) => ({ tag: r.t, count: r.n })) });
+  } catch (e) {
+    next(e);
+  }
+});
+
+// おすすめ。ブラウザが持っている好みの記録を受け取り、並べて返す。サーバーには保存しない
+app.post("/api/feed", feedLimiter, async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const limit = Math.min(20, Math.max(1, parseInt(body.limit, 10) || 12));
+    const ids = (a, max) =>
+      (Array.isArray(a) ? a : []).filter((x) => typeof x === "string" && UUID_RE.test(x)).slice(0, max);
+    const exclude = ids(body.exclude, 150);   // いま画面にあるもの（出さない）
+    const seen = new Set(ids(body.seen, 150)); // 見たことがあるもの（後ろに回す）
+
+    const tagW = {};
+    if (body.tags && typeof body.tags === "object") {
+      for (const [k, v] of Object.entries(body.tags).slice(0, 40)) {
+        if (TAG_RE.test(k) && Number.isFinite(v)) tagW[k] = Math.min(8, Math.max(-3, v));
+      }
+    }
+    const seeds = [];
+    for (const s of (Array.isArray(body.seeds) ? body.seeds : []).slice(0, 30)) {
+      if (s && typeof s.id === "string" && UUID_RE.test(s.id) && Number.isFinite(s.w)) {
+        seeds.push({ id: s.id, w: Math.min(5, Math.max(0, s.w)) });
+      }
+    }
+
+    const cand = await pool.query(
+      `SELECT ${POST_COLS},
+              EXISTS (SELECT 1 FROM likes l WHERE l.post_id = p.id AND l.client_id = $3::text) AS liked,
+              p.embedding
+         FROM posts p
+        WHERE p.reports < $1 AND NOT (p.id = ANY($2::uuid[]))
+        ORDER BY p.created_at DESC
+        LIMIT 400`,
+      [REPORT_LIMIT, exclude, clientId(req)]
+    );
+    if (!cand.rows.length) return res.json({ posts: [] });
+
+    const seedVecs = new Map();
+    if (seeds.length) {
+      const sv = await pool.query(
+        "SELECT id, embedding FROM posts WHERE id = ANY($1::uuid[]) AND embedding IS NOT NULL",
+        [seeds.map((s) => s.id)]
+      );
+      sv.rows.forEach((r) => seedVecs.set(r.id, fromBuffer(r.embedding)));
+    }
+
+    const byId = new Map(cand.rows.map((r) => [r.id, r]));
+    const ranked = rankFeed({
+      candidates: cand.rows.map((r) => ({
+        id: r.id,
+        tags: r.tags || [],
+        createdAt: r.created_at.getTime(),
+        likes: r.like_count,
+        comments: r.comment_count,
+        vec: r.embedding ? fromBuffer(r.embedding) : null,
+      })),
+      profile: { tags: tagW, seeds, seen },
+      seedVecs,
+      now: Date.now(),
+      limit,
+    });
+    res.json({ posts: ranked.map((c) => postRow(byId.get(c.id))) });
   } catch (e) {
     next(e);
   }
@@ -455,8 +607,6 @@ app.post("/api/comments/:id/report", reportLimiter, async (req, res, next) => {
 });
 
 /* ---------- 似ている絵の確認（原作者向け） ---------- */
-const reviewLimiter = limiter(120);
-
 // 自分の投稿の削除キーを送ると、その絵に似た絵（後から投稿されたもの）の一覧が返る
 app.post("/api/review/list", reviewLimiter, async (req, res, next) => {
   try {
